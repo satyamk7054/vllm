@@ -204,6 +204,7 @@ def get_lora_op_configs(
     num_slices: int,
     add_inputs: bool | None = None,
     moe_intermediate_size: int | None = None,
+    num_active_loras: int | None = None,
 ) -> dict[str, int | None]:
     # Add support for fused_moe_lora ops
     assert op_type in [
@@ -279,11 +280,18 @@ def get_lora_op_configs(
         logger.warning_once("Using default LoRA kernel configs")
         return default
 
-    # config is structured as config_data[max_loras][num_slices][m][k][n] = {}
-    # slice by max_loras
+    # Configs are keyed config_data[primary][num_slices][m][k][n]. The primary key
+    # is num_active_loras (the count the kernel grid actually runs on, and what the
+    # optimal config depends on) for the shrink/expand ops, which pass it; the
+    # fused_moe_lora_* ops don't pass it and key on max_loras. Nearest-neighbor
+    # resolution means a config tuned at a single count still matches every count,
+    # so existing max_loras-keyed folders keep working unchanged.
+    primary_key = num_active_loras if num_active_loras is not None else max_loras
+
+    # slice by the primary key (num_active_loras or max_loras)
     config_data = (
-        config_data.get(str(max_loras))
-        or config_data[min(config_data.keys(), key=lambda x: abs(int(x) - max_loras))]
+        config_data.get(str(primary_key))
+        or config_data[min(config_data.keys(), key=lambda x: abs(int(x) - primary_key))]
     )
     # slice by num_slices
     config_data = config_data[str(num_slices)]

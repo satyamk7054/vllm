@@ -206,6 +206,7 @@ def _lora_shrink(
         hidden_size=K,
         rank=N,
         num_slices=NUM_SLICES,
+        num_active_loras=num_active_loras.item(),
     )
     BLOCK_M = kernel_config["block_m"]
     BLOCK_N = kernel_config["block_n"]

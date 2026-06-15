@@ -218,6 +218,7 @@ def _lora_expand(
         rank=K,
         num_slices=NUM_SLICES,
         add_inputs=add_inputs,
+        num_active_loras=num_active_loras.item(),
     )
     BLOCK_M = kernel_config["block_m"]
     BLOCK_N = kernel_config["block_n"]

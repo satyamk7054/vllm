@@ -39,6 +39,11 @@ Multi-lora shrink/expand Triton kernel tuning follows a similar methodology from
    vLLM's [benchmark_lora.py](https://github.com/vllm-project/vllm/blob/main/benchmarks/kernels/benchmark_lora.py)
    can be used to search for configurations for different shapes.
 
+4. Tune per `num_active_loras`. The shrink/expand grid's third axis is `num_active_loras` (the number
+   of adapters active in a batch), and the optimal config — most sharply `split_k` — depends on it, so
+   search separately at each `num_active_loras` you expect in production, using
+   `benchmark_lora.py --num-active-loras N`.
+
 ## Config Files
 
 ### File Naming
@@ -56,5 +61,21 @@ The `gpu_name` can be automatically detected by calling `torch.cuda.get_device_n
 
 ### JSON Structure
 
-Optimal kernel configuration files are saved as JSON files with the structure `config_data[max_loras][num_slices][m][k][n][i]`,
-where `i` is an optional dimension in the `fused_moe_lora` configuration, representing the intermediate size of the MoE layer.
+Config files use the nesting `config_data[primary][num_slices][m][k][n][i]`, where `i` is an optional
+dimension in the `fused_moe_lora` configuration representing the intermediate size of the MoE layer.
+The shrink/expand ops key by `num_active_loras` (the count the kernel grid runs on); the
+`fused_moe_lora_*` ops key by `max_loras`:
+
+```text
+config_data[num_active_loras][num_slices][m][k][n][i]   # shrink / expand
+config_data[max_loras][num_slices][m][k][n][i]          # fused_moe_lora_*
+```
+
+The loader selects the bucket nearest the runtime value, so a file need only contain the buckets you
+tuned.
+
+**Backward compatibility.** Shrink/expand configs were previously keyed by `max_loras`; they are now
+read as `num_active_loras`. Because selection is nearest-neighbor, a file with a single top-level key
+resolves to that key at every active count — identical to the old behavior — so existing tuned folders
+keep working unchanged. Supplying a config per `num_active_loras` (multiple top-level keys) is what
+opts into per-active-count selection.
